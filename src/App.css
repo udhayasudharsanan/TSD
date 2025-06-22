@@ -1,0 +1,14 @@
+@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@keyframes movePlane {
+  0% { transform: translateX(-10px); }
+  50% { transform: translateX(6px); }
+  100% { transform: translateX(-10px); }
+}
+
+.animate-flight {
+  animation: movePlane 2.5s ease-in-out infinite;
+}
