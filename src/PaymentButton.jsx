@@ -1,11 +1,26 @@
-import { collection, addDoc } from "firebase/firestore";
+import { collection, addDoc, doc, getDoc } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { db } from "./firebase";
 import { useAuth } from "./AuthContext"; 
 
 function PaymentButton({ amount, cartItems, clearCart }) {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [address, setAddress] = useState(null);
+
+  useEffect(() => {
+    const fetchAddress = async () => {
+      if (user?.uid) {
+        const docRef = doc(db, "addresses", user.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setAddress(docSnap.data());
+        }
+      }
+    };
+    fetchAddress();
+  }, [user]);
 
   const loadRazorpay = (src) =>
     new Promise((resolve) => {
@@ -21,7 +36,7 @@ function PaymentButton({ amount, cartItems, clearCart }) {
     if (!res) return alert("Razorpay SDK failed to load.");
 
     const options = {
-      key: import.meta.env.VITE_RAZORPAY_KEY, // Replace with your test/live key
+      key: import.meta.env.VITE_RAZORPAY_KEY,
       amount: amount * 100,
       currency: "INR",
       name: "Timple Saree Store",
@@ -29,19 +44,18 @@ function PaymentButton({ amount, cartItems, clearCart }) {
       prefill: {
         name: user?.displayName || "Guest User",
         email: user?.email || "guest@example.com",
-        contact: "9000000000",
+        contact: address?.phone || "9000000000", // ✅ using Firestore phone
       },
-      theme: { color: "#4f46e5" }, // indigo-800
+      theme: { color: "#4f46e5" },
 
-      // ✅ Payment success handler
       handler: async function (response) {
         const paymentId = response.razorpay_payment_id;
-
         try {
           await addDoc(collection(db, "orders"), {
             userId: user?.uid || "guest",
             name: user?.displayName || "Unknown",
             email: user?.email || "unknown@example.com",
+            phone: address?.phone || "9000000000", // ✅ store phone too
             items: cartItems,
             total: amount,
             paymentId,
@@ -51,8 +65,6 @@ function PaymentButton({ amount, cartItems, clearCart }) {
           });
 
           clearCart();
-
-          // ✅ Ensure navigation works properly after update
           setTimeout(() => {
             navigate(`/payment-success?payment_id=${paymentId}`);
           }, 100);
@@ -62,7 +74,6 @@ function PaymentButton({ amount, cartItems, clearCart }) {
         }
       },
 
-      // ✅ If user exits/cancels payment
       modal: {
         ondismiss: function () {
           console.warn("Payment cancelled by user");
